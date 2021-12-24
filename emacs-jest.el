@@ -1,0 +1,136 @@
+;;; emacs-jest.el --- Jest testing framework in GNU Emacs                     -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2021  Yev Barkalov
+
+;; Author: Yev Barkalov <yev@yev.bar>
+;; Keywords: lisp
+;; Version: 0.0.1
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; This package provides a way to use Jest in emacs.
+;; Note, this refers to the JavaScript testing framework <https://jestjs.io/>
+
+;;; Code:
+
+;; code goes here
+(require 'noflet)
+(require 'compile)
+
+(defvar node-error-regexp
+  "^[  ]+at \\(?:[^\(\n]+ \(\\)?\\(\\(?:[a-zA-Z]:\\)?[a-zA-Z\.0-9_/\\-]+\\):\\([0-9]+\\):\\([0-9]+\\)\)?"
+  "Regular expression to match NodeJS errors.
+From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilation-mode/")
+
+(defvar node-error-regexp-alist
+  `((,node-error-regexp 1 2 3)))
+
+(defun jest-compilation-filter ()
+  "Filter function for compilation output."
+  (ansi-color-apply-on-region compilation-filter-start (point-max)))
+
+(define-compilation-mode jest-compilation-mode "Jest"
+  "Jest compilation mode."
+  (progn
+    (set (make-local-variable 'compilation-error-regexp-alist) node-error-regexp-alist)
+    (add-hook 'compilation-filter-hook 'jest-compilation-filter nil t)
+    ))
+
+(defun get-jest-executable ()
+  (let ((project-provided-jest-path (concat default-directory "node_modules/.bin/jest")))
+    (cond
+     ;; Check to see if an executable exists within the `default-directory` value
+     ((file-exists-p project-provided-jest-path) project-provided-jest-path)
+     ;; Check to see if there's a global jest executable
+     ((executable-find "jest") "jest")
+     ;; Otherwise we throw an error
+     (t (error "Failed to find jest executable")))))
+
+;; TODO - account for custom variables (ie maxWorkers)
+(defun get-jest-arguments (&optional arguments)
+  ;; TODO - change arguments format to be list of lists (optional)
+  (if arguments
+      (string-join arguments " ")
+    ""))
+
+;; TODO - make this something configurable as well (with extra options)
+;; Takes optional list of tuples and applies them to jest command
+(defun generate-jest-command (&optional arguments)
+  (let ((jest-executable (get-jest-executable))
+	(jest-arguments (get-jest-arguments arguments)))
+    (string-join `(,jest-executable ,jest-arguments) " ")))
+
+(defun run-jest-command (&optional arguments)
+  (interactive)
+  ;; Check there are no unsaved buffers
+  (save-some-buffers (not compilation-ask-about-save)
+                     (when (boundp 'compilation-save-buffers-predicate)
+                       compilation-save-buffers-predicate))
+
+  ;; Kill previous test buffer if exists
+  (when (get-buffer "*jest tests*")
+    (kill-buffer "*jest tests*"))
+
+  ;; Storing `intended-directory` since this changes when
+  ;; we change window if there's more than one buffer
+  (let ((intended-directory (projectile-project-root)))
+    (if (eq 1 (length (window-list)))
+	;; If there's only one window, split horizontally
+	(progn
+	 (split-window-right)
+	 (other-window 1))
+      ;; Otherwise, go to the last visited window
+      (select-window (previous-window)))
+
+    ;; Create new buffer and run command
+    (with-current-buffer (get-buffer-create "*jest tests*")
+      (switch-to-buffer "*jest tests*")
+      (let ((default-directory intended-directory) (compilation-scroll-output t))
+	(compilation-start
+	 (generate-jest-command arguments)
+	 'jest-compilation-mode
+	 (lambda (m) (buffer-name)))))))
+
+(defun jest-test-file (&optional filename)
+  (interactive)
+  (cond
+   ((not filename)
+    (let ((helm-projectile-sources-list
+	   '(helm-source-projectile-buffers-list
+	     helm-source-projectile-files-list)))
+      (noflet ((helm-find-file-or-marked (candidate) (jest-test-file candidate))
+	       (helm-buffer-switch-buffers (candidate) (jest-test-file (buffer-file-name candidate))))
+	(helm-projectile))))
+   ((file-exists-p filename)
+    (run-jest-command `(,filename)))
+   (t
+    (error "Invalid file provided"))))
+
+(defun jest-test-current-file ()
+  (interactive)
+  (jest-test-file buffer-file-name))
+
+(defun jest-test-directory (&optional directory)
+  (interactive)
+  (unless directory (setq directory (read-directory-name "Test directory:")))
+  (run-jest-command `(,directory)))
+
+(defun jest-test-current-directory ()
+  (interactive)
+  (jest-test-directory default-directory))
+
+(provide 'emacs-jest)
+;;; emacs-jest.el ends here
