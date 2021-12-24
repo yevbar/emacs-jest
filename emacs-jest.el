@@ -38,11 +38,11 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defvar node-error-regexp-alist
   `((,node-error-regexp 1 2 3)))
 
+;;; Related to the compilation buffer
 (defun jest-compilation-filter ()
   "Filter function for compilation output."
   (ansi-color-apply-on-region compilation-filter-start (point-max)))
 
-;; TODO - Modify so that closing the compilation buffer closes the window
 (define-compilation-mode jest-compilation-mode "Jest"
   "Jest compilation mode."
   (progn
@@ -50,6 +50,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
     (add-hook 'compilation-filter-hook 'jest-compilation-filter nil t)
     ))
 
+;;; Related to actually running jest
 (defun get-jest-executable ()
   (let ((project-provided-jest-path (concat default-directory "node_modules/.bin/jest")))
     (cond
@@ -62,15 +63,9 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 
 ;; TODO - account for custom variables (ie maxWorkers)
 (defun get-jest-arguments (&optional arguments)
-  ;; TODO - change arguments format to be list of lists (optional)
   (if arguments
       (string-join
-       (mapcar
-	(lambda (argument)
-	  (if (proper-list-p argument)
-	      (string-join argument " ") argument)
-	arguments)
-	" ")
+       (flatten-list arguments) " ")
     ""))
 
 ;; TODO - make this something configurable as well (with extra options)
@@ -93,12 +88,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   ;; Storing `intended-directory` since this changes when
   ;; we change window if there's more than one buffer
   (let ((intended-directory (projectile-project-root)))
-    (if (eq 1 (length (window-list)))
-	;; If there's only one window, split horizontally
-	(progn
-	 (split-window-right)
-	 (other-window 1))
-      ;; Otherwise, go to the last visited window
+    (unless (eq 1 (length (window-list)))
       (select-window (previous-window)))
 
     ;; Create new buffer and run command
