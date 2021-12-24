@@ -64,7 +64,13 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun get-jest-arguments (&optional arguments)
   ;; TODO - change arguments format to be list of lists (optional)
   (if arguments
-      (string-join arguments " ")
+      (string-join
+       (mapcar
+	(lambda (argument)
+	  (if (proper-list-p argument)
+	      (string-join argument " ") argument)
+	arguments)
+	" ")
     ""))
 
 ;; TODO - make this something configurable as well (with extra options)
