@@ -82,7 +82,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (if arguments
       (string-join
        ;; TODO - Figure out what to do about duplicates/overwrites
-       (flatten-list jest-environment-vars arguments jest-default-args) " ")
+       (flatten-list (list jest-environment-vars arguments jest-default-args)) " ")
     ""))
 
 ;; Takes optional list of tuples and applies them to jest command
