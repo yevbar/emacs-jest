@@ -55,8 +55,19 @@
   :type 'boolean
   :group 'jest)
 
-;; TODO - config to save output from compilation call to file
-;; TODO - either generate SES on the fly or create SES file (latter is likely better)
+(defcustom jest-parse-coverage-into-org nil
+  "Parse jest coverage as org file when completed"
+  :type 'boolean
+  :group 'jest)
+
+(defcustom jest-org-save-destination nil
+  "Where to store jest coverage results"
+  :type 'string
+  :group 'jest)
+
+;; TODO - save historical results as custom config
+;; TODO - if ^ then make chart to show jest coverage change over time (per branch etc)
+;; TODO - take coverage results and highlight lines in file(s)
 
 ;;; General utils
 (defvar node-error-regexp
@@ -77,6 +88,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (progn
     (set (make-local-variable 'compilation-error-regexp-alist) node-error-regexp-alist)
     (add-hook 'compilation-filter-hook 'jest-compilation-filter nil t)
+    (add-to-list 'compilation-finish-function 'jest-autogenerate-coverage--if-configured)
     ))
 
 ;;; Related to actually running jest
@@ -175,6 +187,14 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun jest-test-coverage ()
   (interactive)
   (run-jest-command (with-coverage-args)))
+
+(defun jest-autogenerate-coverage--if-configured ()
+  (when jest-parse-coverage-into-org
+    (jest-generate-coverage)))
+
+(defun jest-generate-coverage ()
+  (interactive)
+  (message "This is where we parse the coverage/ folder to generate org file"))
 
 (provide 'emacs-jest)
 ;;; emacs-jest.el ends here
