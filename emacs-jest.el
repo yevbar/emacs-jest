@@ -37,12 +37,12 @@
 
 (defcustom jest-environment-vars nil
   "Environment variables that get applied to all jest calls"
-  :type string
+  :type 'string
   :group 'jest)
 
 (defcustom jest-default-args nil
   "Arguments that get applied to all jest calls"
-  :type string
+  :type 'string
   :group 'jest)
 
 ;;; General utils
