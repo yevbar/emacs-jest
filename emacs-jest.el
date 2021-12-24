@@ -45,6 +45,19 @@
   :type 'string
   :group 'jest)
 
+(defcustom jest-stop-after-first-failure nil
+  "Stop any jest call after first failure"
+  :type 'boolean
+  :group 'jest)
+
+(defcustom jest-stop-coverage-after-first-failure nil
+  "Stop a jest coverage call after first failure"
+  :type 'boolean
+  :group 'jest)
+
+;; TODO - config to save output from compilation call to file
+;; TODO - either generate SES on the fly or create SES file (latter is likely better)
+
 ;;; General utils
 (defvar node-error-regexp
   "^[  ]+at \\(?:[^\(\n]+ \(\\)?\\(\\(?:[a-zA-Z]:\\)?[a-zA-Z\.0-9_/\\-]+\\):\\([0-9]+\\):\\([0-9]+\\)\)?"
@@ -76,6 +89,17 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
      ((executable-find "jest") "jest")
      ;; Otherwise we throw an error
      (t (error "Failed to find jest executable")))))
+
+(defun should-bail-after-first-failure (&optional is-coverage)
+  (or jest-stop-after-first-failure
+   (and is-coverage jest-stop-coverage-after-first-failure)))
+
+(defun with-coverage-args (&optional arguments)
+  (let* ((minimum-coverage-args (list "--coverage"))
+	 (coverage-args (if (should-bail-after-first-failure t) (append minimum-coverage-args (list "--bail")) minimum-coverage-args)))
+    (if arguments
+	(append arguments coverage-args)
+      coverage-args)))
 
 ;; TODO - account for custom variables (ie maxWorkers)
 (defun get-jest-arguments (&optional arguments)
@@ -143,6 +167,10 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun jest-test-current-directory ()
   (interactive)
   (jest-test-directory default-directory))
+
+(defun jest-test-coverage ()
+  (interactive)
+  (run-jest-command (with-coverage-args)))
 
 (provide 'emacs-jest)
 ;;; emacs-jest.el ends here
