@@ -42,6 +42,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   "Filter function for compilation output."
   (ansi-color-apply-on-region compilation-filter-start (point-max)))
 
+;; TODO - Modify so that closing the compilation buffer closes the window
 (define-compilation-mode jest-compilation-mode "Jest"
   "Jest compilation mode."
   (progn
@@ -74,7 +75,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
     (string-join `(,jest-executable ,jest-arguments) " ")))
 
 (defun run-jest-command (&optional arguments)
-  (interactive)
   ;; Check there are no unsaved buffers
   (save-some-buffers (not compilation-ask-about-save)
                      (when (boundp 'compilation-save-buffers-predicate)
