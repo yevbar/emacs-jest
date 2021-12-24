@@ -101,12 +101,16 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	(append arguments coverage-args)
       coverage-args)))
 
-;; TODO - account for custom variables (ie maxWorkers)
 (defun get-jest-arguments (&optional arguments)
   (if arguments
       (string-join
        ;; TODO - Figure out what to do about duplicates/overwrites
-       (flatten-list (list jest-environment-vars arguments jest-default-args)) " ")
+       (flatten-list
+	(list
+	 jest-environment-vars
+	 arguments
+	 jest-default-args
+	 (when (should-bail-after-first-failure) "--bail"))) " ")
     ""))
 
 ;; Takes optional list of tuples and applies them to jest command
