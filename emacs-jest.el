@@ -101,16 +101,16 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (when (get-buffer "*jest tests*")
     (kill-buffer "*jest tests*"))
 
-  ;; Storing `intended-directory` since this changes when
+  ;; Storing `target-directory` since this changes when
   ;; we change window if there's more than one buffer
-  (let ((intended-directory (projectile-project-root)))
+  (let ((target-directory (projectile-project-root)))
     (unless (eq 1 (length (window-list)))
       (select-window (previous-window)))
 
     ;; Create new buffer and run command
     (with-current-buffer (get-buffer-create "*jest tests*")
       (switch-to-buffer "*jest tests*")
-      (let ((default-directory intended-directory) (compilation-scroll-output t))
+      (let ((default-directory target-directory) (compilation-scroll-output t))
 	(compilation-start
 	 (generate-jest-command arguments)
 	 'jest-compilation-mode
