@@ -30,6 +30,22 @@
 (require 'noflet)
 (require 'compile)
 
+;;; Custom vars
+(defgroup jest nil
+  "Tools for running jest tests"
+  :group 'tools)
+
+(defcustom jest-environment-vars nil
+  "Environment variables that get applied to all jest calls"
+  :type string
+  :group 'jest)
+
+(defcustom jest-default-args nil
+  "Arguments that get applied to all jest calls"
+  :type string
+  :group 'jest)
+
+;;; General utils
 (defvar node-error-regexp
   "^[  ]+at \\(?:[^\(\n]+ \(\\)?\\(\\(?:[a-zA-Z]:\\)?[a-zA-Z\.0-9_/\\-]+\\):\\([0-9]+\\):\\([0-9]+\\)\)?"
   "Regular expression to match NodeJS errors.
@@ -65,10 +81,10 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun get-jest-arguments (&optional arguments)
   (if arguments
       (string-join
-       (flatten-list arguments) " ")
+       ;; TODO - Figure out what to do about duplicates/overwrites
+       (flatten-list jest-environment-vars arguments jest-default-args) " ")
     ""))
 
-;; TODO - make this something configurable as well (with extra options)
 ;; Takes optional list of tuples and applies them to jest command
 (defun generate-jest-command (&optional arguments)
   (let ((jest-executable (get-jest-executable))
