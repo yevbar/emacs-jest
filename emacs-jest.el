@@ -59,16 +59,6 @@
   :type 'boolean
   :group 'jest)
 
-(defcustom jest-parse-coverage-into-org nil
-  "Parse jest coverage as org file when completed"
-  :type 'boolean
-  :group 'jest)
-
-(defcustom jest-org-save-destination nil
-  "Where to store jest coverage results"
-  :type 'string
-  :group 'jest)
-
 ;; TODO - save historical results as custom config
 ;; TODO - if ^ then make chart to show jest coverage change over time (per branch etc)
 ;; TODO - take coverage results and highlight lines in file(s)
@@ -309,7 +299,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 
 ;; Returns a spreadsheet presentable version of the clover.xml report
 ;; if package is provided then generates based on that package
-(defun jest-parse--clover-xml-result (&optional package)
+(defun jest-parse--clover-xml-result ()
   ;; TODO - check that clover.xml actually exists here
   ;;(unless )
 
@@ -319,14 +309,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 			 (libxml-parse-xml-region (point-min) (point-max))))
 	 (project-node (first (dom-by-tag xml-dom-tree 'project)))
 	 (package-nodes (dom-by-tag project-node 'package))
-	 (desired-package (when package
-			    (let ((package-index (-find-index (lambda (package-node) (string-equal package (jest-parse-clover-xml-package-name package-node))))))
-			      (if package-index
-				  (nth package-index package-nodes)
-				(error "Invalid package name provided")))))
-	 (target-nodes (if (not desired-package)
-			   (append (list project-node) package-nodes)
-			 (jest-parse--clover-xml-package-and-files desired-package))))
+	 (target-nodes (append (list project-node) package-nodes)))
     (list
      (list "File" "Covered Statements" "Total Statements" "Covered Conditionals" "Total Conditionals" "Covered Methods" "Total Methods")
      (jest-parse--clover-xml-metrics target-nodes))))
@@ -360,7 +343,8 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 
 ;; TODO - use table-type for org/ses/etc
 (defun present-coverage-as-table (columns table &optional table-type)
-  ;; TODO - check column/table length
+  (when (= (length columns) 0)
+    (error "Invalid columns passed in"))
 
   (check-buffer-does-not-exist "*jest coverage*")
 
@@ -415,21 +399,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		   (color-to-apply (get-highlight-color-from-percentage percentage))
 		   (overlay (make-overlay cell-start cell-end)))
 	      (hlt-highlight-region cell-start cell-end `((t (:background ,color-to-apply)))))))))))
-
-(defun jest-get-org-coverage ()
-  (interactive)
-  ;; TODO - check if current project even has a jest/npm thing accessible
-  (unless (file-directory-p (concat (projectile-project-root) "coverage"))
-    (error "You need to run with coverage")) ;; Make reference to jest-test-coverage or smth
-
-  ;; TODO - move this to parse-lcov-report
-  (unless (file-directory-p (concat (projectile-project-root) "coverage/lcov-report"))
-    ;; TODO - figure out how to parse other coverage reporters
-    (error "You need to make sure jest is configured with `lcov` as a coverage reporter"))
-
-  ;; TODO - provide options if there are more than one coverage provider? (ie do lcov-report or clover etc)
-
-  (jest-parse-lcov-report))
 
 (provide 'emacs-jest)
 ;;; emacs-jest.el ends here
