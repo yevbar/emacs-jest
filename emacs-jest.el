@@ -29,6 +29,9 @@
 ;; code goes here
 (require 'noflet)
 (require 'compile)
+(require 'xml)
+(require 'dom)
+(require 'highlight)
 
 ;;; Custom vars
 (defgroup jest nil
@@ -78,6 +81,50 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defvar node-error-regexp-alist
   `((,node-error-regexp 1 2 3)))
 
+;; Takes a buffer name and kills if exists
+;; Also takes optional boolean to raise error if buffer exists instead of killing it
+(defun check-buffer-does-not-exist (buffer-name &optional error-if-exists)
+  (let ((buffer-exists (get-buffer buffer-name)))
+    (cond
+     ((and buffer-exists error-if-exists)
+      (error (concat "Buffer " buffer-name " already exists")))
+     (buffer-exists
+      (kill-buffer buffer-name)))))
+
+;; Replaces in string
+;; Graciously taken from https://stackoverflow.com/a/17325791/16587811
+(defun replace-in-string (what with in)
+  (replace-regexp-in-string (regexp-quote what) with in nil 'literal))
+
+;; If whole number, returns as is
+;; Otherwise formats up to two decimal places
+(defun format-decimal (value)
+  (cond
+   ((eq 0 value)
+    "0%")
+   (t
+    (concat (format "%.4g" value) "%"))))
+
+(defun get-percentage (portion total)
+  (cond
+   ((eq 0 portion)
+    (format-decimal 0))
+   ((eq 0 total)
+    (format-decimal 0))
+   ((eq portion total)
+    (format-decimal 100))
+   (t
+    (format-decimal (* 100 (/ (float portion) total))))))
+
+(defun last-character (str)
+  (substring str -1 nil))
+
+(defun is-percentage (str)
+  (string-equal (last-character str) "%"))
+
+(defun extract-percentage (percentage-string)
+  (string-to-number (substring percentage-string 0 -1)))
+
 ;;; Related to the compilation buffer
 (defun jest-compilation-filter ()
   "Filter function for compilation output."
@@ -87,9 +134,13 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   "Jest compilation mode."
   (progn
     (set (make-local-variable 'compilation-error-regexp-alist) node-error-regexp-alist)
+    (set (make-local-variable 'compilation-finish-functions) 'jest-after-completion-hook)
     (add-hook 'compilation-filter-hook 'jest-compilation-filter nil t)
-    (add-to-list 'compilation-finish-function 'jest-autogenerate-coverage--if-configured)
     ))
+
+;; TODO - change this to a list or smth so people can add their own custom extensions/modifications
+;; (append-to-list 'jest-after-completion-hook ...)
+(defun jest-after-completion-hook (&rest args))
 
 ;;; Related to actually running jest
 (defun get-jest-executable ()
@@ -138,8 +189,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
                        compilation-save-buffers-predicate))
 
   ;; Kill previous test buffer if exists
-  (when (get-buffer "*jest tests*")
-    (kill-buffer "*jest tests*"))
+  (check-buffer-does-not-exist "*jest tests*")
 
   ;; Storing `target-directory` since this changes when
   ;; we change window if there's more than one buffer
@@ -188,13 +238,217 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (interactive)
   (run-jest-command (with-coverage-args)))
 
-(defun jest-autogenerate-coverage--if-configured ()
-  (when jest-parse-coverage-into-org
-    (jest-generate-coverage)))
+;;; Coverage related
+;; Parse a coverage table page
+(defun jest-parse-lcov-report-coverage-table ()
+  )
 
-(defun jest-generate-coverage ()
+;; Parse an individual file coverage page
+(defun jest-parse-lcov-report-coverage-file ()
+  )
+
+(defun jest-parse-lcov-report ()
+  
+  )
+
+(defun jest-parse-clover-xml-metrics (metrics-node)
+  (list
+   (list "Statements"
+	 (string-to-number (dom-attr metrics-node 'coveredstatements))
+	 (string-to-number (dom-attr metrics-node 'statements)))
+   (list "Conditionals"
+	 (string-to-number (dom-attr metrics-node 'coveredconditionals))
+	 (string-to-number (dom-attr metrics-node 'conditionals)))
+   (list "Methods"
+	 (string-to-number (dom-attr metrics-node 'coveredmethods))
+	 (string-to-number (dom-attr metrics-node 'methods)))))
+
+;; Takes a <package> node obtained from clover.xml and returns the attributes related to coverage
+(defun jest-parse-clover-xml-package-coverage (package-node)
+  (let ((metrics-node (first (dom-by-tag package-node 'metrics))))
+    (jest-parse-clover-xml-metrics metrics-node)))
+
+(defun jest-parse-clover-xml-package-name (package-node)
+  (let ((name-attr-value (dom-attr package-node 'name)))
+  (replace-in-string "\." "\/" name-attr-value)))
+
+(defun jest-parse-clover-xml-package (package-node)
+  (list
+   (jest-parse-clover-xml-package-name package-node)
+   (jest-parse-clover-xml-package-coverage package-node)))
+
+(defun jest-parse-clover-xml-project-coverage (project-node)
+  (let ((project-metrics (first (dom-by-tag project-node 'metrics))))
+    (jest-parse-clover-xml-metrics project-metrics)))
+
+(defun jest-parse-clover-xml-project-name (project-node)
+  (dom-attr project-node 'name))
+
+(defun jest-parse-clover-xml-project (project-node)
+  (list
+   (jest-parse-clover-xml-project-name project-node)
+   (jest-parse-clover-xml-project-coverage project-node)))
+
+(global-unset-key (kbd "C-:"))
+(global-set-key (kbd "C-:") 'jest-parse-clover-xml)
+
+(defun jest-parse-clover-xml ()
   (interactive)
-  (message "This is where we parse the coverage/ folder to generate org file"))
+  (let* ((clover-xml-filepath (concat (projectile-project-root) "coverage/clover.xml"))
+	  (xml-dom-tree (with-temp-buffer
+			  (insert-file-contents clover-xml-filepath)
+			  (libxml-parse-xml-region (point-min) (point-max))))
+	  ;; TODO - Change this into something failure tolerant?
+	  (project-node (first (dom-by-tag xml-dom-tree 'project)))
+	  (project-coverage (jest-parse-clover-xml-project project-node))
+	  (package-nodes (dom-by-tag xml-dom-tree 'package))
+	  (package-coverages (mapcar 'jest-parse-clover-xml-package package-nodes)))
+    (jest-present-project-coverage project-coverage package-coverages)))
+
+(defun jest-parse-column-names (overall-coverage)
+  (append
+   (list "File")
+   (mapcan
+    (lambda (coverage-item)
+      (let ((coverage-attribute (first coverage-item)))
+	(list
+	 (concat "Covered "coverage-attribute)
+	 (concat "Total " coverage-attribute))))
+    (second overall-coverage))))
+
+(defun jest-format-coverage-attribute-values (coverage-attribute)
+  (let ((covered-count (second coverage-attribute))
+	(total-count (third coverage-attribute)))
+    (list (get-percentage covered-count total-count)
+	  (concat (number-to-string covered-count) "/" (number-to-string total-count)))))
+
+(defun jest-format-coverage-row (coverage)
+  (let ((item-name (first coverage))
+	(column-values
+	 (mapcan 'jest-format-coverage-attribute-values (second coverage))))
+    (concat
+     "|"
+     (string-join (append (list item-name) column-values) "|")
+     "|")))
+
+(defun jest-format-overall-coverage-attribute (overall-coverage-attribute)
+  (let* ((formatted-coverage-results (jest-format-coverage-attribute-values overall-coverage-attribute))
+	 (formatted-percentage (first formatted-coverage-results))
+	 (formatted-fraction (second formatted-coverage-results))
+	 (category (first overall-coverage-attribute)))
+    (string-join
+     (list formatted-percentage category (concat "(" formatted-fraction ")"))
+     " ")))
+
+(defun jest-format-overall-coverage (overall-coverage)
+  ;; Join the string by space
+  ;; Join all the categories by space+comma
+  (let ((coverage-attributes (mapcar 'jest-format-overall-coverage-attribute (second overall-coverage))))
+    (string-join coverage-attributes ", ")))
+
+(defun get-highlight-color-from-percentage (value)
+  (cond
+   ((>= value 80)
+    "green")
+   ((>= value 60)
+    "yellow")
+   (t
+    "red")))
+
+;; TODO - move this into init.el and add as snippet to README?
+(defun get-cell-info ()
+  (interactive)
+  (when (org-table-p)
+    (let ((filename (org-table-get nil 1))
+	  (column-name (org-table-get 1 nil)))
+      (message (string-join (list filename column-name) " - ")))))
+
+(global-set-key (kbd "C-c i") 'get-cell-info)
+
+(defun add-coverage-table-color-indicators ()
+  (interactive)
+  (let* ((tree (org-element-parse-buffer))
+         (tables (org-element-map tree 'table 'identity)))
+    (org-element-map (car tables) 'table-cell
+      (lambda (x)
+	(let ((cell-value (car (org-element-contents x)))
+	      (cell-start (org-element-property :begin x))
+	      (cell-end (- (org-element-property :end x) 1)))
+	  (when (is-percentage cell-value)
+	    (let* ((percentage (extract-percentage cell-value))
+		   (color-to-apply (get-highlight-color-from-percentage percentage))
+		   (overlay (make-overlay cell-start cell-end)))
+	      (hlt-highlight-region cell-start cell-end `((t (:background ,color-to-apply)))))))))))
+
+;; TODO - change file obtaining into util that returns nil if doesn't exist
+;; TODO - make separate function that takes in string instead of node
+
+;; This takes two list that look like
+;; (project-name ((coverage-attribute covered-count total-count) (coverage-attribute covered-count total-count))),
+
+;; ((package-name ((coverage-attribute covered-count total-count) (coverage-attribute covered-count total-count)))
+;;  (package-name ((coverage-attribute covered-count total-count) (coverage-attribute covered-count total-count)))...)
+(defun jest-present-project-coverage (overall-coverage coverage)
+  (unless (< 0 (length coverage))
+    (error "No coverage to present"))
+
+  ;; TODO - change to be formatted with overall-coverage name so we can have multiple folders open
+  ;; Kill previous test buffer if exists
+  (check-buffer-does-not-exist "*jest coverage*")
+
+  (with-current-buffer (get-buffer-create "*jest coverage*")
+    (switch-to-buffer "*jest coverage*")
+    (let ((column-names (jest-parse-column-names overall-coverage)))
+      ;; Overall metrics
+      (insert (first overall-coverage))
+      (newline)
+      (insert (jest-format-overall-coverage overall-coverage))
+      (newline)
+      (newline)
+
+      ;; Adding column headers
+      (insert (concat "|" (string-join column-names "|") "|"))
+      (newline)
+
+      (insert "|-")
+      (newline)
+
+      ;; Adding metrics for each item
+      (mapc
+       (lambda (individual-coverage)
+	 (progn
+	   (insert (jest-format-coverage-row individual-coverage))
+	   (newline)))
+       coverage)
+
+      ;; Deleting the last (newline) call
+      (backward-delete-char-untabify 1)
+
+      ;; Turning on org mode so we can format table
+      (org-mode)
+      (org-table-align)
+      (add-coverage-table-color-indicators)
+
+      ;; Adding hook so highlights can be re-introduced even after sorting column
+      (add-hook 'org-ctrl-c-ctrl-c-hook 'add-coverage-table-color-indicators)
+
+      ;; Moving to start of file
+      (beginning-of-buffer))))
+
+(defun jest-get-org-coverage ()
+  (interactive)
+  ;; TODO - check if current project even has a jest/npm thing accessible
+  (unless (file-directory-p (concat (projectile-project-root) "coverage"))
+    (error "You need to run with coverage")) ;; Make reference to jest-test-coverage or smth
+
+  ;; TODO - move this to parse-lcov-report
+  (unless (file-directory-p (concat (projectile-project-root) "coverage/lcov-report"))
+    ;; TODO - figure out how to parse other coverage reporters
+    (error "You need to make sure jest is configured with `lcov` as a coverage reporter"))
+
+  ;; TODO - provide options if there are more than one coverage provider? (ie do lcov-report or clover etc)
+
+  (jest-parse-lcov-report))
 
 (provide 'emacs-jest)
 ;;; emacs-jest.el ends here
