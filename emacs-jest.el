@@ -381,21 +381,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	 (table (second parse-result)))
     (present-coverage-as-table columns table)))
 
-(defun jest-format-overall-coverage-attribute (overall-coverage-attribute)
-  (let* ((formatted-coverage-results (jest-format-coverage-attribute-values overall-coverage-attribute))
-	 (formatted-percentage (first formatted-coverage-results))
-	 (formatted-fraction (second formatted-coverage-results))
-	 (category (first overall-coverage-attribute)))
-    (string-join
-     (list formatted-percentage category (concat "(" formatted-fraction ")"))
-     " ")))
-
-(defun jest-format-overall-coverage (overall-coverage)
-  ;; Join the string by space
-  ;; Join all the categories by space+comma
-  (let ((coverage-attributes (mapcar 'jest-format-overall-coverage-attribute (second overall-coverage))))
-    (string-join coverage-attributes ", ")))
-
 (defun get-highlight-color-from-percentage (value)
   (cond
    ((>= value 80)
@@ -405,7 +390,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
    (t
     "red")))
 
-;; TODO - move this into init.el and add as snippet to README?
+;;; TODO - move this into init.el and add as snippet to README?
 (defun get-cell-info ()
   (interactive)
   (when (org-table-p)
@@ -414,6 +399,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
       (message (string-join (list filename column-name) " - ")))))
 
 (global-set-key (kbd "C-c i") 'get-cell-info)
+;;; END
 
 (defun add-coverage-table-color-indicators ()
   (interactive)
@@ -429,61 +415,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		   (color-to-apply (get-highlight-color-from-percentage percentage))
 		   (overlay (make-overlay cell-start cell-end)))
 	      (hlt-highlight-region cell-start cell-end `((t (:background ,color-to-apply)))))))))))
-
-;; TODO - change file obtaining into util that returns nil if doesn't exist
-;; TODO - make separate function that takes in string instead of node
-
-;; This takes two list that look like
-;; (project-name ((coverage-attribute covered-count total-count) (coverage-attribute covered-count total-count))),
-
-;; ((package-name ((coverage-attribute covered-count total-count) (coverage-attribute covered-count total-count)))
-;;  (package-name ((coverage-attribute covered-count total-count) (coverage-attribute covered-count total-count)))...)
-(defun jest-present-project-coverage (overall-coverage coverage)
-  (unless (< 0 (length coverage))
-    (error "No coverage to present"))
-
-  ;; TODO - change to be formatted with overall-coverage name so we can have multiple folders open
-  ;; Kill previous test buffer if exists
-  (check-buffer-does-not-exist "*jest coverage*")
-
-  (with-current-buffer (get-buffer-create "*jest coverage*")
-    (switch-to-buffer "*jest coverage*")
-    (let ((column-names (jest-parse-column-names overall-coverage)))
-      ;; Overall metrics
-      (insert (first overall-coverage))
-      (newline)
-      (insert (jest-format-overall-coverage overall-coverage))
-      (newline)
-      (newline)
-
-      ;; Adding column headers
-      (insert (concat "|" (string-join column-names "|") "|"))
-      (newline)
-
-      (insert "|-")
-      (newline)
-
-      ;; Adding metrics for each item
-      (mapc
-       (lambda (individual-coverage)
-	 (progn
-	   (insert (jest-format-coverage-row individual-coverage))
-	   (newline)))
-       coverage)
-
-      ;; Deleting the last (newline) call
-      (backward-delete-char-untabify 1)
-
-      ;; Turning on org mode so we can format table
-      (org-mode)
-      (org-table-align)
-      (add-coverage-table-color-indicators)
-
-      ;; Adding hook so highlights can be re-introduced even after sorting column
-      (add-hook 'org-ctrl-c-ctrl-c-hook 'add-coverage-table-color-indicators)
-
-      ;; Moving to start of file
-      (beginning-of-buffer))))
 
 (defun jest-get-org-coverage ()
   (interactive)
