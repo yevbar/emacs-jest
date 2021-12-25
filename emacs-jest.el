@@ -32,6 +32,7 @@
 (require 'xml)
 (require 'dom)
 (require 'highlight)
+(require 'dash)
 
 ;;; Custom vars
 (defgroup jest nil
@@ -117,6 +118,8 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
     (format-decimal (* 100 (/ (float portion) total))))))
 
 (defun last-character (str)
+  (unless str
+    "")
   (substring str -1 nil))
 
 (defun is-percentage (str)
@@ -251,18 +254,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   
   )
 
-(defun jest-parse-clover-xml-metrics (metrics-node)
-  (list
-   (list "Statements"
-	 (string-to-number (dom-attr metrics-node 'coveredstatements))
-	 (string-to-number (dom-attr metrics-node 'statements)))
-   (list "Conditionals"
-	 (string-to-number (dom-attr metrics-node 'coveredconditionals))
-	 (string-to-number (dom-attr metrics-node 'conditionals)))
-   (list "Methods"
-	 (string-to-number (dom-attr metrics-node 'coveredmethods))
-	 (string-to-number (dom-attr metrics-node 'methods)))))
-
 ;; Takes a <package> node obtained from clover.xml and returns the attributes related to coverage
 (defun jest-parse-clover-xml-package-coverage (package-node)
   (let ((metrics-node (first (dom-by-tag package-node 'metrics))))
@@ -284,52 +275,110 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun jest-parse-clover-xml-project-name (project-node)
   (dom-attr project-node 'name))
 
-(defun jest-parse-clover-xml-project (project-node)
-  (list
-   (jest-parse-clover-xml-project-name project-node)
-   (jest-parse-clover-xml-project-coverage project-node)))
-
 (global-unset-key (kbd "C-:"))
 (global-set-key (kbd "C-:") 'jest-parse-clover-xml)
 
+(defun jest-parse--clover-xml-metrics-single-node (node)
+  (let* ((node-name (dom-attr node 'name))
+	 (metrics-node (first (dom-by-tag node 'metrics)))
+	 (covered-statements (string-to-number (dom-attr metrics-node 'coveredstatements)))
+	 (total-statements (string-to-number (dom-attr metrics-node 'statements)))
+	 (covered-conditionals (string-to-number (dom-attr metrics-node 'coveredconditionals)))
+	 (total-conditionals (string-to-number (dom-attr metrics-node 'conditionals)))
+	 (covered-methods (string-to-number (dom-attr metrics-node 'coveredmethods)))
+	 (total-methods (string-to-number (dom-attr metrics-node 'methods))))
+    (list
+     node-name
+     (get-percentage covered-statements total-statements)
+     (concat (number-to-string covered-statements) "/" (number-to-string total-statements))
+     (get-percentage covered-conditionals total-conditionals)
+     (concat (number-to-string covered-conditionals) "/" (number-to-string total-conditionals))
+     (get-percentage covered-methods total-methods)
+     (concat (number-to-string covered-methods) "/" (number-to-string total-methods)))))
+
+;; Takes a list of nodes belonging to a clover xml file and returns
+;; the parse table of values
+(defun jest-parse--clover-xml-metrics (nodes)
+  (mapcar 'jest-parse--clover-xml-metrics-single-node nodes))
+
+;; Takes a package node and returns the file nodes associated with it
+(defun jest-parse--clover-xml-package-and-files (package-node)
+  (append (list package-node)
+	  (dom-by-tag package-node 'file)))
+
+;; Returns a spreadsheet presentable version of the clover.xml report
+;; if package is provided then generates based on that package
+(defun jest-parse--clover-xml-result (&optional package)
+  ;; TODO - check that clover.xml actually exists here
+  ;;(unless )
+
+  (let* ((clover-xml-filepath (concat (projectile-project-root) "coverage/clover.xml"))
+	 (xml-dom-tree (with-temp-buffer
+			 (insert-file-contents clover-xml-filepath)
+			 (libxml-parse-xml-region (point-min) (point-max))))
+	 (project-node (first (dom-by-tag xml-dom-tree 'project)))
+	 (package-nodes (dom-by-tag project-node 'package))
+	 (desired-package (when package
+			    (let ((package-index (-find-index (lambda (package-node) (string-equal package (jest-parse-clover-xml-package-name package-node))))))
+			      (if package-index
+				  (nth package-index package-nodes)
+				(error "Invalid package name provided")))))
+	 (target-nodes (if (not desired-package)
+			   (append (list project-node) package-nodes)
+			 (jest-parse--clover-xml-package-and-files desired-package))))
+    (list
+     (list "File" "Covered Statements" "Total Statements" "Covered Conditionals" "Total Conditionals" "Covered Methods" "Total Methods")
+     (jest-parse--clover-xml-metrics target-nodes))))
+
+(defun present-coverage-as-org-table (columns table)
+  (insert (concat "|" (string-join columns "|") "|"))
+  (newline)
+
+  (insert "|-")
+  (newline)
+
+  (mapc
+   (lambda (row)
+     (progn
+       (insert (concat "|" (string-join row "|") "|"))
+       (newline)))
+   table)
+
+  ;; Deleting the last (newline) call
+  (backward-delete-char-untabify 1)
+
+  (org-mode)
+  (org-table-align)
+  (add-coverage-table-color-indicators)
+
+  ;; Adding hook so highlights can be re-introduced even after sorting column
+  (add-hook 'org-ctrl-c-ctrl-c-hook 'add-coverage-table-color-indicators)
+
+  ;; Moving to start of file
+  (beginning-of-buffer))
+
+;; TODO - use table-type for org/ses/etc
+(defun present-coverage-as-table (columns table &optional table-type)
+  ;; TODO - check column/table length
+
+  (check-buffer-does-not-exist "*jest coverage*")
+
+  ;; TODO - change to be formatted with overall-coverage name so we can have multiple folders open
+  (with-current-buffer (get-buffer-create "*jest coverage*")
+    (switch-to-buffer "*jest coverage*")
+    (present-coverage-as-org-table columns table)))
+
+;;; FORMAT
+;; Two values
+;; First: List containing column headers ('File', 'Covered Statements', 'Total Statements', ...)
+;; Second: List containing row values based on headers ('src/app', 10, 15, ...)
+
 (defun jest-parse-clover-xml ()
   (interactive)
-  (let* ((clover-xml-filepath (concat (projectile-project-root) "coverage/clover.xml"))
-	  (xml-dom-tree (with-temp-buffer
-			  (insert-file-contents clover-xml-filepath)
-			  (libxml-parse-xml-region (point-min) (point-max))))
-	  ;; TODO - Change this into something failure tolerant?
-	  (project-node (first (dom-by-tag xml-dom-tree 'project)))
-	  (project-coverage (jest-parse-clover-xml-project project-node))
-	  (package-nodes (dom-by-tag xml-dom-tree 'package))
-	  (package-coverages (mapcar 'jest-parse-clover-xml-package package-nodes)))
-    (jest-present-project-coverage project-coverage package-coverages)))
-
-(defun jest-parse-column-names (overall-coverage)
-  (append
-   (list "File")
-   (mapcan
-    (lambda (coverage-item)
-      (let ((coverage-attribute (first coverage-item)))
-	(list
-	 (concat "Covered "coverage-attribute)
-	 (concat "Total " coverage-attribute))))
-    (second overall-coverage))))
-
-(defun jest-format-coverage-attribute-values (coverage-attribute)
-  (let ((covered-count (second coverage-attribute))
-	(total-count (third coverage-attribute)))
-    (list (get-percentage covered-count total-count)
-	  (concat (number-to-string covered-count) "/" (number-to-string total-count)))))
-
-(defun jest-format-coverage-row (coverage)
-  (let ((item-name (first coverage))
-	(column-values
-	 (mapcan 'jest-format-coverage-attribute-values (second coverage))))
-    (concat
-     "|"
-     (string-join (append (list item-name) column-values) "|")
-     "|")))
+  (let* ((parse-result (jest-parse--clover-xml-result))
+	 (columns (first parse-result))
+	 (table (second parse-result)))
+    (present-coverage-as-table columns table)))
 
 (defun jest-format-overall-coverage-attribute (overall-coverage-attribute)
   (let* ((formatted-coverage-results (jest-format-coverage-attribute-values overall-coverage-attribute))
