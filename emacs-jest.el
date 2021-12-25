@@ -332,6 +332,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   ;; Moving to start of file
   (beginning-of-buffer)
 
+  ;; TODO - bc this does not work the deeper you go, change this into an app level app
   (local-set-key (kbd "C-c c") (lambda ()
 				 (interactive)
 				 (when (org-table-p)
@@ -341,6 +342,8 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 				     (cond
 				      ((eq row-index 0)
 				       (message "Already viewing"))
+				      ;; TODO - add check here to figure out if it's a file or not
+				      ;; ^ use list approach but be single element (filepath)
 				      (row-index
 				       (present-coverage-as-table
 					row-identifier
@@ -355,7 +358,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (let ((desired-buffer-name (concat "coverage: " title)))
     (check-buffer-does-not-exist desired-buffer-name)
 
-    ;; TODO - change to be formatted with overall-coverage name so we can have multiple folders open
     (with-current-buffer (get-buffer-create desired-buffer-name)
       (switch-to-buffer desired-buffer-name)
       (present-coverage-as-org-table columns table))))
