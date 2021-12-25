@@ -290,7 +290,8 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun jest-parse--clover-xml-single-package (package-node)
   ;; get package stats
   ;; get files + stats
-  ;; merge)
+  ;; merge
+  )
 
 ;; Takes a list of package nodes and returns their rows as well as their corresponding file tables data
 (defun jest-parse--clover-xml-package-metrics (package-nodes)
