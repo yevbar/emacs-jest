@@ -242,35 +242,17 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   
   )
 
-;; Takes a <package> node obtained from clover.xml and returns the attributes related to coverage
-(defun jest-parse-clover-xml-package-coverage (package-node)
-  (let ((metrics-node (first (dom-by-tag package-node 'metrics))))
-    (jest-parse-clover-xml-metrics metrics-node)))
-
-;; Takes either a node or string to format
-(defun jest-parse-clover-xml-package-name (package-name)
-  (unless (stringp package-name)
-    (setq package-name (name-attr-value (dom-attr package-node 'name))))
-
-  (replace-in-string "\." "\/" package-name))
-
-(defun jest-parse-clover-xml-package (package-node)
-  (list
-   (jest-parse-clover-xml-package-name package-node)
-   (jest-parse-clover-xml-package-coverage package-node)))
-
-(defun jest-parse-clover-xml-project-coverage (project-node)
-  (let ((project-metrics (first (dom-by-tag project-node 'metrics))))
-    (jest-parse-clover-xml-metrics project-metrics)))
-
-(defun jest-parse-clover-xml-project-name (project-node)
-  (dom-attr project-node 'name))
+(defun jest-parse-clover-xml-get-node-name (node)
+  (let ((name (dom-attr node 'name)))
+    (if (eql (dom-tag node) 'package)
+	(replace-in-string "\." "\/" name)
+      name)))
 
 (global-unset-key (kbd "C-:"))
 (global-set-key (kbd "C-:") 'jest-parse-clover-xml)
 
 (defun jest-parse--clover-xml-metrics-single-node (node)
-  (let* ((node-name (jest-parse-clover-xml-package-name (dom-attr node 'name)))
+  (let* ((node-name (jest-parse-clover-xml-get-node-name node))
 	 (metrics-node (first (dom-by-tag node 'metrics)))
 	 (covered-statements (string-to-number (dom-attr metrics-node 'coveredstatements)))
 	 (total-statements (string-to-number (dom-attr metrics-node 'statements)))
