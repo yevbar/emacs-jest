@@ -118,8 +118,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
     (format-decimal (* 100 (/ (float portion) total))))))
 
 (defun last-character (str)
-  (unless str
-    "")
   (substring str -1 nil))
 
 (defun is-percentage (str)
