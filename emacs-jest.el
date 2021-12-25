@@ -287,15 +287,14 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
      (get-percentage covered-methods total-methods)
      (concat (number-to-string covered-methods) "/" (number-to-string total-methods)))))
 
-;; Takes a list of nodes belonging to a clover xml file and returns
-;; the parse table of values
-(defun jest-parse--clover-xml-metrics (nodes)
-  (mapcar 'jest-parse--clover-xml-metrics-single-node nodes))
+(defun jest-parse--clover-xml-single-package (package-node)
+  ;; get package stats
+  ;; get files + stats
+  ;; merge)
 
-;; Takes a package node and returns the file nodes associated with it
-(defun jest-parse--clover-xml-package-and-files (package-node)
-  (append (list package-node)
-	  (dom-by-tag package-node 'file)))
+;; Takes a list of package nodes and returns their rows as well as their corresponding file tables data
+(defun jest-parse--clover-xml-package-metrics (package-nodes)
+  (mapcar 'jest-parse--clover-xml-metrics-single-node package-nodes))
 
 ;; Returns a spreadsheet presentable version of the clover.xml report
 ;; if package is provided then generates based on that package
@@ -308,11 +307,12 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 			 (insert-file-contents clover-xml-filepath)
 			 (libxml-parse-xml-region (point-min) (point-max))))
 	 (project-node (first (dom-by-tag xml-dom-tree 'project)))
-	 (package-nodes (dom-by-tag project-node 'package))
-	 (target-nodes (append (list project-node) package-nodes)))
+	 (package-nodes (dom-by-tag project-node 'package)))
     (list
      (list "File" "Covered Statements" "Total Statements" "Covered Conditionals" "Total Conditionals" "Covered Methods" "Total Methods")
-     (jest-parse--clover-xml-metrics target-nodes))))
+     (append
+      (list (jest-parse--clover-xml-metrics-single-node project-node))
+      (jest-parse--clover-xml-package-metrics package-nodes)))))
 
 (defun present-coverage-as-org-table (columns table)
   (insert (concat "|" (string-join columns "|") "|"))
@@ -324,7 +324,13 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (mapc
    (lambda (row)
      (progn
-       (insert (concat "|" (string-join row "|") "|"))
+       (insert "|")
+       (mapc
+	(lambda (item)
+	  (when (not (proper-list-p item))
+	    (insert item)
+	    (insert "|")))
+	row)
        (newline)))
    table)
 
@@ -339,31 +345,46 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (add-hook 'org-ctrl-c-ctrl-c-hook 'add-coverage-table-color-indicators)
 
   ;; Moving to start of file
-  (beginning-of-buffer))
+  (beginning-of-buffer)
+
+  (local-set-key (kbd "C-c c") (lambda ()
+				 (interactive)
+				 (when (org-table-p)
+				   (let* ((row-identifier (org-table-get nil 1))
+					  (row-index (-find-index (lambda (row) (string-equal row-identifier (first row))) table))
+					  (selected-row (unless (or (not row-index) (eq row-index 0)) (nth row-index table))))
+				     (cond
+				      ((eq row-index 0)
+				       (message "Already viewing"))
+				      (row-index
+				       (error "%s" selected-row)
+				       (present-coverage-as-table row-identifier columns (append (list selected-row) (last selected-row))))))))))
 
 ;; TODO - use table-type for org/ses/etc
-(defun present-coverage-as-table (columns table &optional table-type)
+(defun present-coverage-as-table (title columns table &optional table-type)
   (when (= (length columns) 0)
     (error "Invalid columns passed in"))
 
-  (check-buffer-does-not-exist "*jest coverage*")
+  (let ((desired-buffer-name (concat "coverage: " title)))
+    (check-buffer-does-not-exist desired-buffer-name)
 
-  ;; TODO - change to be formatted with overall-coverage name so we can have multiple folders open
-  (with-current-buffer (get-buffer-create "*jest coverage*")
-    (switch-to-buffer "*jest coverage*")
-    (present-coverage-as-org-table columns table)))
+    ;; TODO - change to be formatted with overall-coverage name so we can have multiple folders open
+    (with-current-buffer (get-buffer-create desired-buffer-name)
+      (switch-to-buffer desired-buffer-name)
+      (present-coverage-as-org-table columns table))))
 
 ;;; FORMAT
 ;; Two values
 ;; First: List containing column headers ('File', 'Covered Statements', 'Total Statements', ...)
-;; Second: List containing row values based on headers ('src/app', 10, 15, ...)
+;; Second: List containing row values based on headers AND (optional) a table that should be rendered when row is selected
+;; ('src/app', 10, 15, ..., ())
 
 (defun jest-parse-clover-xml ()
   (interactive)
   (let* ((parse-result (jest-parse--clover-xml-result))
 	 (columns (first parse-result))
 	 (table (second parse-result)))
-    (present-coverage-as-table columns table)))
+    (present-coverage-as-table "All files" columns table)))
 
 (defun get-highlight-color-from-percentage (value)
   (cond
