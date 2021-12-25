@@ -257,9 +257,12 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (let ((metrics-node (first (dom-by-tag package-node 'metrics))))
     (jest-parse-clover-xml-metrics metrics-node)))
 
-(defun jest-parse-clover-xml-package-name (package-node)
-  (let ((name-attr-value (dom-attr package-node 'name)))
-  (replace-in-string "\." "\/" name-attr-value)))
+;; Takes either a node or string to format
+(defun jest-parse-clover-xml-package-name (package-name)
+  (unless (stringp package-name)
+    (setq package-name (name-attr-value (dom-attr package-node 'name))))
+
+  (replace-in-string "\." "\/" package-name))
 
 (defun jest-parse-clover-xml-package (package-node)
   (list
@@ -277,7 +280,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (global-set-key (kbd "C-:") 'jest-parse-clover-xml)
 
 (defun jest-parse--clover-xml-metrics-single-node (node)
-  (let* ((node-name (dom-attr node 'name))
+  (let* ((node-name (jest-parse-clover-xml-package-name (dom-attr node 'name)))
 	 (metrics-node (first (dom-by-tag node 'metrics)))
 	 (covered-statements (string-to-number (dom-attr metrics-node 'coveredstatements)))
 	 (total-statements (string-to-number (dom-attr metrics-node 'statements)))
