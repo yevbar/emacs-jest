@@ -288,14 +288,16 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
      (concat (number-to-string covered-methods) "/" (number-to-string total-methods)))))
 
 (defun jest-parse--clover-xml-single-package (package-node)
-  ;; get package stats
-  ;; get files + stats
-  ;; merge
-  )
+  (let* ((package-coverage (jest-parse--clover-xml-metrics-single-node package-node))
+	 (file-nodes (dom-by-tag package-node 'file))
+	 (files-coverage (mapcar 'jest-parse--clover-xml-metrics-single-node file-nodes)))
+    (append
+     package-coverage
+     (list files-coverage))))
 
 ;; Takes a list of package nodes and returns their rows as well as their corresponding file tables data
 (defun jest-parse--clover-xml-package-metrics (package-nodes)
-  (mapcar 'jest-parse--clover-xml-metrics-single-node package-nodes))
+  (mapcar 'jest-parse--clover-xml-single-package package-nodes))
 
 ;; Returns a spreadsheet presentable version of the clover.xml report
 ;; if package is provided then generates based on that package
@@ -358,8 +360,10 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 				      ((eq row-index 0)
 				       (message "Already viewing"))
 				      (row-index
-				       (error "%s" selected-row)
-				       (present-coverage-as-table row-identifier columns (append (list selected-row) (last selected-row))))))))))
+				       (present-coverage-as-table
+					row-identifier
+					columns
+					(append (list selected-row) (first (last selected-row)))))))))))
 
 ;; TODO - use table-type for org/ses/etc
 (defun present-coverage-as-table (title columns table &optional table-type)
