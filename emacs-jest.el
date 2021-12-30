@@ -229,63 +229,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (interactive)
   (run-jest-command (with-coverage-args)))
 
-(defun jest-parse-clover-xml-get-node-name (node)
-  (let ((name (dom-attr node 'name)))
-    (if (eql (dom-tag node) 'package)
-	(replace-in-string "\." "\/" name)
-      name)))
-
-(global-unset-key (kbd "C-:"))
-(global-set-key (kbd "C-:") 'jest-parse-clover-xml)
-
-(defun jest-parse--clover-xml-metrics-single-node (node)
-  (let* ((node-name (jest-parse-clover-xml-get-node-name node))
-	 (metrics-node (first (dom-by-tag node 'metrics)))
-	 (covered-statements (string-to-number (dom-attr metrics-node 'coveredstatements)))
-	 (total-statements (string-to-number (dom-attr metrics-node 'statements)))
-	 (covered-conditionals (string-to-number (dom-attr metrics-node 'coveredconditionals)))
-	 (total-conditionals (string-to-number (dom-attr metrics-node 'conditionals)))
-	 (covered-methods (string-to-number (dom-attr metrics-node 'coveredmethods)))
-	 (total-methods (string-to-number (dom-attr metrics-node 'methods))))
-    (list
-     node-name
-     (get-percentage covered-statements total-statements)
-     (concat (number-to-string covered-statements) "/" (number-to-string total-statements))
-     (get-percentage covered-conditionals total-conditionals)
-     (concat (number-to-string covered-conditionals) "/" (number-to-string total-conditionals))
-     (get-percentage covered-methods total-methods)
-     (concat (number-to-string covered-methods) "/" (number-to-string total-methods)))))
-
-(defun jest-parse--clover-xml-single-package (package-node)
-  (let* ((package-coverage (jest-parse--clover-xml-metrics-single-node package-node))
-	 (file-nodes (dom-by-tag package-node 'file))
-	 (files-coverage (mapcar 'jest-parse--clover-xml-metrics-single-node file-nodes)))
-    (append
-     package-coverage
-     (list files-coverage))))
-
-;; Takes a list of package nodes and returns their rows as well as their corresponding file tables data
-(defun jest-parse--clover-xml-package-metrics (package-nodes)
-  (mapcar 'jest-parse--clover-xml-single-package package-nodes))
-
-;; Returns a spreadsheet presentable version of the clover.xml report
-;; if package is provided then generates based on that package
-(defun jest-parse--clover-xml-result ()
-  ;; TODO - check that clover.xml actually exists here
-  ;;(unless )
-
-  (let* ((clover-xml-filepath (concat (projectile-project-root) "coverage/clover.xml"))
-	 (xml-dom-tree (with-temp-buffer
-			 (insert-file-contents clover-xml-filepath)
-			 (libxml-parse-xml-region (point-min) (point-max))))
-	 (project-node (first (dom-by-tag xml-dom-tree 'project)))
-	 (package-nodes (dom-by-tag project-node 'package)))
-    (list
-     (list "File" "Covered Statements" "Total Statements" "Covered Conditionals" "Total Conditionals" "Covered Methods" "Total Methods")
-     (append
-      (list (jest-parse--clover-xml-metrics-single-node project-node))
-      (jest-parse--clover-xml-package-metrics package-nodes)))))
-
 (defun present-coverage-as-org-table (columns table)
   (insert (concat "|" (string-join columns "|") "|"))
   (newline)
@@ -297,12 +240,8 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
    (lambda (row)
      (progn
        (insert "|")
-       (mapc
-	(lambda (item)
-	  (when (not (proper-list-p item))
-	    (insert item)
-	    (insert "|")))
-	row)
+       (insert (string-join row "|"))
+       (insert "|")
        (newline)))
    table)
 
@@ -317,25 +256,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (add-hook 'org-ctrl-c-ctrl-c-hook 'add-coverage-table-color-indicators)
 
   ;; Moving to start of file
-  (beginning-of-buffer)
-
-  ;; TODO - bc this does not work the deeper you go, change this into an app level app
-  (local-set-key (kbd "C-c c") (lambda ()
-				 (interactive)
-				 (when (org-table-p)
-				   (let* ((row-identifier (org-table-get nil 1))
-					  (row-index (-find-index (lambda (row) (string-equal row-identifier (first row))) table))
-					  (selected-row (unless (or (not row-index) (eq row-index 0)) (nth row-index table))))
-				     (cond
-				      ((eq row-index 0)
-				       (message "Already viewing"))
-				      ;; TODO - add check here to figure out if it's a file or not
-				      ;; ^ use list approach but be single element (filepath)
-				      (row-index
-				       (present-coverage-as-table
-					row-identifier
-					columns
-					(append (list selected-row) (first (last selected-row)))))))))))
+  (beginning-of-buffer))
 
 ;; TODO - use table-type for org/ses/etc
 (defun present-coverage-as-table (title columns table &optional table-type)
@@ -354,13 +275,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 ;; First: List containing column headers ('File', 'Covered Statements', 'Total Statements', ...)
 ;; Second: List containing row values based on headers AND (optional) a table that should be rendered when row is selected
 ;; ('src/app', 10, 15, ..., ())
-
-(defun jest-parse-clover-xml ()
-  (interactive)
-  (let* ((parse-result (jest-parse--clover-xml-result))
-	 (columns (first parse-result))
-	 (table (second parse-result)))
-    (present-coverage-as-table "All files" columns table)))
 
 (defun get-highlight-color-from-percentage (value)
   (cond
@@ -397,9 +311,83 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		   (overlay (make-overlay cell-start cell-end)))
 	      (hlt-highlight-region cell-start cell-end `((t (:background ,color-to-apply)))))))))))
 
+;; This takes an lcov-report HTML and returns
+;; ("<title>", "X% <category> (M/N)", "X% <category> (M/N)", "X% <category> (M/N)")
+(defun jest-parse--lcov-report-meta (lcov-report-html)
+  (let* ((title (dom-texts (first (dom-by-tag lcov-report-html 'h1))))
+	 (category-tags (dom-by-class lcov-report-html "space-right2"))
+	 ;; TODO break up into flatter let block
+	 (category-stats (string-join
+			  (mapcar
+			   (lambda (category-stat)
+			     (let* ((info-elements (dom-by-tag category-stat 'span))
+				    (info-texts (mapcar 'dom-text info-elements)))
+			       (concat (first info-texts) " " (second info-texts) " (" (third info-texts) ")")))
+			   category-tags))))
+    (append (list title) category-stats)))
+
+(defun jest-parse--lcov-report-row-identifier (lcov-report-row)
+  (let* ((a-tag (first (dom-by-tag lcov-report-row 'a)))
+	 (a-href (dom-attr a-tag 'href)))
+    (if (string-suffix-p "index.html" a-href)
+	(substring a-href 0 -10)
+      (substring a-href 0 -5))))
+
+(defun jest-parse--lcov-report-row (lcov-report-row)
+  (let ((identifier (jest-parse--lcov-report-row-identifier lcov-report-row))
+	(data (mapcar 'dom-text (cdr (cdr (dom-by-tag lcov-report-row 'td))))))
+    (append (list identifier) data)))
+
+;; Takes the lcov-report HTML and returns the rows to be rendered in a table
+;; (("<identifier", "X%", "A/B", "Y%", "C/D"...),
+;;  ("<identifier", "X%", "A/B", "Y%", "C/D"...)...)
+(defun jest-parse--lcov-report-rows (lcov-report-html)
+  (let* ((table-body (first (dom-by-tag lcov-report-html 'tbody)))
+	 (table-rows (dom-by-tag table-body 'tr)))
+    (mapcar 'jest-parse--lcov-report-row table-rows)))
+
 ;; TODO - be able to take any lcov html and generate table
-(defun jest-parse--lcov-report ()
-  )
+(defun jest-parse--lcov-report (lcov-report-html)
+  (let ((meta (jest-parse--lcov-report-meta lcov-report-html))
+	(rows (jest-parse--lcov-report-rows lcov-report-html)))
+    (let ((desired-buffer-name (concat "coverage: " (first meta))))
+      (check-buffer-does-not-exist desired-buffer-name)
+
+      (with-current-buffer (get-buffer-create desired-buffer-name)
+	(switch-to-buffer desired-buffer-name)
+	(present-coverage-as-org-table
+	 (list "File" "Statements Covered" "Statements" "Branches Covered" "Branches" "Functions Covered" "Functions" "Lines Covered" "Lines")
+	 rows)))))
+
+(defun jest-parse--lcov-report-target (&optional target)
+  (let* ((target-file (cond
+		      ((null target)
+		       "index.html")
+		      ((string-suffix-p "/" target)
+		       (concat target "index.html"))
+		      (t
+		       (concat target ".html"))))
+	 (target-filepath (concat (projectile-project-root) "coverage/lcov-report/" target-file))
+	 (xml-dom-tree (with-temp-buffer
+			   (insert-file-contents target-filepath)
+			   (libxml-parse-html-region (point-min) (point-max)))))
+    (jest-parse--lcov-report xml-dom-tree)))
+
+(defun jest-get-coverage ()
+  (interactive)
+  (jest-parse--lcov-report-target))
+
+(global-unset-key (kbd "C-:"))
+(global-set-key (kbd "C-:") 'jest-get-coverage)
+
+(defun get-target-coverage ()
+  (interactive)
+  (when (org-table-p)
+    (let ((identifier (org-table-get nil 1)))
+      (jest-parse--lcov-report-target identifier))))
+
+(global-unset-key (kbd "C-c c"))
+(global-set-key (kbd "C-c c") 'get-target-coverage)
 
 (provide 'emacs-jest)
 ;;; emacs-jest.el ends here
