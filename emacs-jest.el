@@ -229,19 +229,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (interactive)
   (run-jest-command (with-coverage-args)))
 
-;;; Coverage related
-;; Parse a coverage table page
-(defun jest-parse-lcov-report-coverage-table ()
-  )
-
-;; Parse an individual file coverage page
-(defun jest-parse-lcov-report-coverage-file ()
-  )
-
-(defun jest-parse-lcov-report ()
-  
-  )
-
 (defun jest-parse-clover-xml-get-node-name (node)
   (let ((name (dom-attr node 'name)))
     (if (eql (dom-tag node) 'package)
@@ -409,6 +396,10 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		   (color-to-apply (get-highlight-color-from-percentage percentage))
 		   (overlay (make-overlay cell-start cell-end)))
 	      (hlt-highlight-region cell-start cell-end `((t (:background ,color-to-apply)))))))))))
+
+;; TODO - be able to take any lcov html and generate table
+(defun jest-parse--lcov-report ()
+  )
 
 (provide 'emacs-jest)
 ;;; emacs-jest.el ends here
