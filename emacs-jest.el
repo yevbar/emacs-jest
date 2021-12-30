@@ -314,7 +314,8 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 ;; This takes an lcov-report HTML and returns
 ;; ("<title>", "X% <category> (M/N)", "X% <category> (M/N)", "X% <category> (M/N)")
 (defun jest-parse--lcov-report-meta (lcov-report-html)
-  (let* ((title (dom-texts (first (dom-by-tag lcov-report-html 'h1))))
+  (let* ((title-text (string-join (split-string (dom-text (first (dom-by-tag lcov-report-html 'h1)))) " "))
+	 (title (if (string-equal title-text "All files") title-text (concat title-text "/")))
 	 (category-tags (dom-by-class lcov-report-html "space-right2"))
 	 ;; TODO break up into flatter let block
 	 (category-stats (string-join
@@ -322,8 +323,9 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 			   (lambda (category-stat)
 			     (let* ((info-elements (dom-by-tag category-stat 'span))
 				    (info-texts (mapcar 'dom-text info-elements)))
-			       (concat (first info-texts) " " (second info-texts) " (" (third info-texts) ")")))
-			   category-tags))))
+			       (concat (first info-texts) (second info-texts) " (" (third info-texts) ")")))
+			   category-tags)
+			  ", ")))
     (append (list title) category-stats)))
 
 (defun jest-parse--lcov-report-row-identifier (lcov-report-row)
@@ -346,11 +348,11 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	 (table-rows (dom-by-tag table-body 'tr)))
     (mapcar 'jest-parse--lcov-report-row table-rows)))
 
-;; TODO - be able to take any lcov html and generate table
 (defun jest-parse--lcov-report (lcov-report-html)
   (let ((meta (jest-parse--lcov-report-meta lcov-report-html))
 	(rows (jest-parse--lcov-report-rows lcov-report-html)))
-    (let ((desired-buffer-name (concat "coverage: " (first meta))))
+    ;;(error "%s" (string-join meta "|"))
+    (let ((desired-buffer-name (concat "coverage <" (first meta) ">")))
       (check-buffer-does-not-exist desired-buffer-name)
 
       (with-current-buffer (get-buffer-create desired-buffer-name)
@@ -380,10 +382,16 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (global-unset-key (kbd "C-:"))
 (global-set-key (kbd "C-:") 'jest-get-coverage)
 
+(defun parse--coverage-target-from-buffer (target)
+  (if (string-match-p (regexp-quote "<All files>") (buffer-name))
+      target
+    (concat (substring (buffer-name) (+ 1 (string-match-p (regexp-quote "<") (buffer-name))) -1) target)))
+
 (defun get-target-coverage ()
   (interactive)
   (when (org-table-p)
-    (let ((identifier (org-table-get nil 1)))
+    (let* ((row-identifier (org-table-get nil 1))
+	   (identifier (parse--coverage-target-from-buffer row-identifier)))
       (jest-parse--lcov-report-target identifier))))
 
 (global-unset-key (kbd "C-c c"))
