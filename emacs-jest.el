@@ -323,7 +323,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	  (when (is-percentage cell-value)
 	    (let* ((percentage (extract-percentage cell-value))
 		   (color-to-apply (get-highlight-color-from-percentage percentage)))
-	      (hlt-highlight-region cell-start cell-end `((t (:background ,color-to-apply)))))))))))
+	      (hlt-highlight-region cell-start cell-end `((t (:foreground "black" :background ,color-to-apply)))))))))))
 
 ;; This takes an lcov-report HTML and returns
 ;; ("<title>", "X% <category> (M/N)", "X% <category> (M/N)", "X% <category> (M/N)")
@@ -439,15 +439,14 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		     (annotation-class (first annotation))
 		     (annotation-content (second annotation))
 		     (content (pad-string-until-length annotation-content (+ longest-line-coverage-text-length 1)))
-		     (color-to-apply (cond
-				      ((string-equal annotation-class "cline-no")
-				       "green")
-				      ((string-equal annotation-class "cline-yes")
-				       "green")
+		     (face-to-apply (cond
+				     ((string-equal annotation-class "cline-no")
+				      `((t (:background "red"))))
+				     ((string-equal annotation-class "cline-yes")
+				      `((t (:foreground "black" :background "green"))))
 				      (t
-				       ""))))
-		(propertize content 'face 'linum))))
-		;; (propertize (pad-string-until-length annotation-content (+ longest-line-coverage-text-length 1)) `((t (:background ,color-to-apply))) 'linum))))
+				       'linum))))
+		(propertize content 'face face-to-apply))))
 
       (mapc
        (lambda (joined-code-coverage-item)
@@ -467,7 +466,13 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	    ((string-prefix-p code-without-uncovered code-content)
 	     (let ((start-index (+ (line-beginning-position) (length code-without-uncovered)))
 		   (end-index (+ (line-beginning-position) (length (string-trim-right code-content)))))
-	       (put-text-property start-index end-index 'face (cons 'background-color "red"))))
+	       (put-text-property start-index end-index 'face (cons 'background-color "red"))
+
+	       ;; Deleting the additional space that comes from dom-text/dom-texts difference
+	       (goto-char start-index)
+	       (delete-backward-char 1)
+	       (move-end-of-line nil)))
+
 	    ;; If uncovered section is in middle of line
 	    (t
 	     (let* ((start-of-deviation (index-of-first-deviating-character code-content code-without-uncovered))
@@ -485,6 +490,8 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	   (newline)))
        joined-code-coverage)
 
+      ;; Deleting the last newline call as well as empty line at end of file
+      (delete-backward-char 2)
       (beginning-of-buffer))))
 
 (defun jest-parse--lcov-report (lcov-report-html)
