@@ -325,6 +325,11 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		   (color-to-apply (get-highlight-color-from-percentage percentage)))
 	      (hlt-highlight-region cell-start cell-end `((t (:foreground "black" :background ,color-to-apply)))))))))))
 
+(defun format-meta-category-stat (category-element)
+  (let* ((info-elements (dom-by-tag category-element 'span))
+	 (info-texts (mapcar 'dom-text info-elements)))
+    (concat (first info-texts) (second info-texts) " (" (third info-texts) ")")))
+
 ;; This takes an lcov-report HTML and returns
 ;; ("<title>", "X% <category> (M/N)", "X% <category> (M/N)", "X% <category> (M/N)")
 (defun jest-parse--lcov-report-meta (lcov-report-html)
@@ -345,12 +350,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	 (category-tags (dom-by-class lcov-report-html "space-right2"))
 	 ;; TODO break up into flatter let block
 	 (category-stats (string-join
-			  (mapcar
-			   (lambda (category-stat)
-			     (let* ((info-elements (dom-by-tag category-stat 'span))
-				    (info-texts (mapcar 'dom-text info-elements)))
-			       (concat (first info-texts) (second info-texts) " (" (third info-texts) ")")))
-			   category-tags)
+			  (mapcar 'format-meta-category-stat category-tags)
 			  ", ")))
     (list title category-stats)))
 
