@@ -14,6 +14,12 @@ This takes the current test file and tests it by taking the jest command output 
 
 ![Running `jest-test-current-file` function](media/jest-test-current-file.gif)
 
+### `get-target-coverage`
+
+When viewing a table and you'd like to navigate to the folder/file belonging to the row your cursor is at, you can invoke `M-x get-target-coverage` or press `C-c c`
+
+![Using `get-target-coverage` function](media/get-target-coverage.gif)
+
 ## Customization
 
 To customize the variables below, `M-x customize-group RET jest RET`
