@@ -6,7 +6,7 @@ This package provides a way to work with [jest](https://jestjs.io/) in [emacs](h
 
 This package introduces a handful of functions for working with jest including:
 
-[Author note: For snippets that could be helpful with the below functions, check out [helpful scripts](#Helpful scripts)]
+[Author note: For snippets that could be helpful with the below functions, check out [helpful scripts](#helpful-scripts)]
 
 ### `jest-test-current-file`
 
