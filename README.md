@@ -18,6 +18,18 @@ This is the directory that the root `index.html` file is expected (Important: wi
 
 ## Helpful scripts
 
+### Making keybinds to quickly access functions
+
+Typing out `M-x jest-get-coverage RET` every time you want to view code coverage results may be a bit much if you're frequently iterating. To find a keybind or chord that isn't claimed by a function, you can do `C-h k <keybind or chord>` to see if it's associated with something.
+
+![Using `C-h k`](media/c-h-k.gif)
+
+Above I'm showing that the keybind `C-:` (press `Control` then `:`) is unclaimed and can have a function associated with it. To associate it with `jest-get-coverage`, it's simply a matter of adding a line to your emacs init file (looks like `~/.emacs` or `~/.emacs.d/init.el`)
+
+```elisp
+(global-set-key (kbd "C-:") 'jest-get-coverage)
+```
+
 ### Working with cells
 
 When presenting code coverage in an org-table, you may want to modify column width but still be able to access cell info. To do so, you can add something like the following to your `init.el` file

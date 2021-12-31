@@ -504,9 +504,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (interactive)
   (jest-parse--lcov-report-target))
 
-(global-unset-key (kbd "C-:"))
-(global-set-key (kbd "C-:") 'jest-get-coverage)
-
 (defun parse--coverage-target-from-buffer (target)
   (if (string-match-p (regexp-quote "<All files>") (buffer-name))
       target
