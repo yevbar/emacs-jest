@@ -36,6 +36,10 @@ Above I'm showing that the keybind `C-:` (press `Control` then `:`) is unclaimed
 (global-set-key (kbd "C-:") 'jest-get-coverage)
 ```
 
+So now whenever I want to pop into the code coverage for the current project, I just press `C-:`
+
+![Using custom keybind](media/c-colon-usage.gif)
+
 ### Working with cells
 
 When presenting code coverage in an org-table, you may want to modify column width but still be able to access cell info. To do so, you can add something like the following to your `init.el` file
