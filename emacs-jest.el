@@ -173,7 +173,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun get-jest-arguments (&optional arguments)
   (if arguments
       (string-join
-       ;; TODO - Figure out what to do about duplicates/overwrites
        (flatten-list
 	(list
 	 jest-environment-vars
@@ -285,12 +284,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
       (switch-to-buffer desired-buffer-name)
       (present-coverage-as-org-table columns table))))
 
-;;; FORMAT
-;; Two values
-;; First: List containing column headers ('File', 'Covered Statements', 'Total Statements', ...)
-;; Second: List containing row values based on headers AND (optional) a table that should be rendered when row is selected
-;; ('src/app', 10, 15, ..., ())
-
 (defun get-highlight-color-from-percentage (value)
   (cond
    ((>= value 80)
@@ -299,17 +292,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
     "yellow")
    (t
     "red")))
-
-;;; TODO - move this into init.el and add as snippet to README?
-(defun get-cell-info ()
-  (interactive)
-  (when (org-table-p)
-    (let ((filename (org-table-get nil 1))
-	  (column-name (org-table-get 1 nil)))
-      (message (string-join (list filename column-name) " - ")))))
-
-(global-set-key (kbd "C-c i") 'get-cell-info)
-;;; END
 
 (defun add-coverage-table-color-indicators ()
   (interactive)
