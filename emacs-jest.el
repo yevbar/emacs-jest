@@ -33,6 +33,7 @@
 (require 'dom)
 (require 'highlight)
 (require 'dash)
+(require 'linum)
 
 ;;; Custom vars
 (defgroup jest nil
@@ -61,7 +62,6 @@
 
 ;; TODO - save historical results as custom config
 ;; TODO - if ^ then make chart to show jest coverage change over time (per branch etc)
-;; TODO - take coverage results and highlight lines in file(s)
 
 ;;; General utils
 (defvar node-error-regexp
@@ -115,6 +115,15 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 
 (defun extract-percentage (percentage-string)
   (string-to-number (substring percentage-string 0 -1)))
+
+(defun string-to-list (str)
+  (mapcar 'char-to-string str))
+
+(defun index-of-first-deviating-character (str1 str2)
+  (let ((zipped (-zip (string-to-list str1) (string-to-list str2))))
+    (-find-index
+     (lambda (x) (not (string-equal (car x) (cdr x))))
+     zipped)))
 
 ;;; Related to the compilation buffer
 (defun jest-compilation-filter ()
@@ -246,7 +255,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
    table)
 
   ;; Deleting the last (newline) call
-  (backward-delete-char-untabify 1)
+  (delete-backward-char 1)
 
   (org-mode)
   (org-table-align)
@@ -307,15 +316,26 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	      (cell-end (- (org-element-property :end x) 1)))
 	  (when (is-percentage cell-value)
 	    (let* ((percentage (extract-percentage cell-value))
-		   (color-to-apply (get-highlight-color-from-percentage percentage))
-		   (overlay (make-overlay cell-start cell-end)))
+		   (color-to-apply (get-highlight-color-from-percentage percentage)))
 	      (hlt-highlight-region cell-start cell-end `((t (:background ,color-to-apply)))))))))))
 
 ;; This takes an lcov-report HTML and returns
 ;; ("<title>", "X% <category> (M/N)", "X% <category> (M/N)", "X% <category> (M/N)")
 (defun jest-parse--lcov-report-meta (lcov-report-html)
-  (let* ((title-text (string-join (split-string (dom-text (first (dom-by-tag lcov-report-html 'h1)))) " "))
-	 (title (if (string-equal title-text "All files") title-text (concat title-text "/")))
+  (let* ((title-text (dom-text (first (dom-by-tag lcov-report-html 'h1))))
+	 (trimmed-title-text (string-join
+			      (-filter
+			       (lambda (x) (not (string-equal "/" x)))
+			       (split-string title-text))
+			      " "))
+	 (title
+	  (cond
+	   ((string-equal trimmed-title-text "All files")
+	    trimmed-title-text)
+	   ((dom-by-class lcov-report-html "coverage-summary")
+	    (concat trimmed-title-text "/"))
+	   (t
+	    trimmed-title-text)))
 	 (category-tags (dom-by-class lcov-report-html "space-right2"))
 	 ;; TODO break up into flatter let block
 	 (category-stats (string-join
@@ -326,7 +346,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 			       (concat (first info-texts) (second info-texts) " (" (third info-texts) ")")))
 			   category-tags)
 			  ", ")))
-    (append (list title) category-stats)))
+    (list title category-stats)))
 
 (defun jest-parse--lcov-report-row-identifier (lcov-report-row)
   (let* ((a-tag (first (dom-by-tag lcov-report-row 'a)))
@@ -348,18 +368,116 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	 (table-rows (dom-by-tag table-body 'tr)))
     (mapcar 'jest-parse--lcov-report-row table-rows)))
 
-(defun jest-parse--lcov-report (lcov-report-html)
+(defun jest-parse--lcov-report-summary (lcov-report-html)
   (let ((meta (jest-parse--lcov-report-meta lcov-report-html))
 	(rows (jest-parse--lcov-report-rows lcov-report-html)))
-    ;;(error "%s" (string-join meta "|"))
     (let ((desired-buffer-name (concat "coverage <" (first meta) ">")))
       (check-buffer-does-not-exist desired-buffer-name)
 
       (with-current-buffer (get-buffer-create desired-buffer-name)
 	(switch-to-buffer desired-buffer-name)
+
+	;; Insert metadata
+	(insert (first meta))
+	(newline)
+	(insert (second meta))
+	(newline)
+	(newline)
+
+	;; Insert table with coverage info
 	(present-coverage-as-org-table
 	 (list "File" "Statements Covered" "Statements" "Branches Covered" "Branches" "Functions Covered" "Functions" "Lines Covered" "Lines")
 	 rows)))))
+
+(defun get-relevant-cline-class (dom-element)
+  (let ((classes (dom-attr dom-element 'class)))
+    (cond
+     ((string-match-p (regexp-quote "cline-no") classes)
+      "cline-no")
+     ((string-match-p (regexp-quote "cline-yes") classes)
+      "cline-yes"))))
+
+(defun format-line-annotation-content (dom-element)
+  (replace-in-string "\u00A0" "" (dom-text dom-element)))
+
+(defun jest-parse--lcov-report-file (lcov-report-html)
+  (let* ((td-elements (dom-by-tag lcov-report-html 'td))
+	 (line-coverage-section (second td-elements))
+	 (obtained-line-coverage-items (dom-by-tag line-coverage-section 'span))
+	 (line-coverage-items (mapcar (lambda (span-element) (list (get-relevant-cline-class span-element) (format-line-annotation-content span-element))) obtained-line-coverage-items))
+	 (code-section (first (dom-by-tag (third td-elements) 'pre)))
+	 (code-lines (split-string (dom-texts code-section) "\n"))
+	 (code-lines-without-uncovered (split-string (dom-text code-section) "\n"))
+	 (joined-code-coverage (-zip code-lines code-lines-without-uncovered))
+	 (title-text (dom-text (first (dom-by-tag lcov-report-html 'h1))))
+	 (filename (string-join
+		    (-filter
+		     (lambda (x) (not (string-equal "/" x)))
+		     (split-string title-text))
+		    " "))
+	 (desired-buffer-name (concat "coverage <" filename ">")))
+    (check-buffer-does-not-exist desired-buffer-name)
+
+    (with-current-buffer (get-buffer-create desired-buffer-name)
+      (switch-to-buffer desired-buffer-name)
+
+      (linum-mode t)
+      (setf linum-format
+	    (lambda (line)
+	      (let* ((annotation (nth (1- line) line-coverage-items))
+		     (annotation-class (first annotation))
+		     (annotation-content (second annotation))
+		     (color-to-apply (cond
+				      ((string-equal annotation-class "cline-no")
+				       "red")
+				      ((string-equal annotation-class "cline-yes")
+				       "green")
+				      (t
+				       ""))))
+		(propertize annotation-content `((t (:background ,color-to-apply))) 'linum))))
+
+      (mapc
+       (lambda (joined-code-coverage-item)
+	 (let ((code-content (car joined-code-coverage-item))
+	       (code-without-uncovered (cdr joined-code-coverage-item)))
+	   (insert code-content)
+
+	   (cond
+	    ;; Do nothing if there are no uncovered snippets in the current line
+	    ((string-equal code-content code-without-uncovered))
+	    ;; If entire line is uncovered
+	    ((string-equal (string-trim code-without-uncovered) "")
+	     (let ((start-index (line-beginning-position))
+		   (end-index (+ (line-beginning-position) (length (string-trim-right code-content)))))
+	       (put-text-property start-index end-index 'face (cons 'background-color "red"))))
+	    ;; If uncovered section is at end of line
+	    ((string-prefix-p code-without-uncovered code-content)
+	     (let ((start-index (+ (line-beginning-position) (length code-without-uncovered)))
+		   (end-index (+ (line-beginning-position) (length (string-trim-right code-content)))))
+	       (put-text-property start-index end-index 'face (cons 'background-color "red"))))
+	    ;; If uncovered section is in middle of line
+	    (t
+	     (let* ((start-of-deviation (index-of-first-deviating-character code-content code-without-uncovered))
+		    (start-index (+ (line-beginning-position) start-of-deviation))
+		    (end-of-deviation (index-of-first-deviating-character (reverse code-content) (reverse code-without-uncovered)))
+		    (end-index (- (+ (line-beginning-position) (length (string-trim-right code-content))) end-of-deviation)))
+	       (put-text-property start-index end-index 'face (cons 'background-color "red"))
+
+	       ;; Deleting the additional spaces that come from dom-text/dom-texts difference
+	       (goto-char start-index)
+	       (delete-backward-char 1)
+	       (goto-char end-index)
+	       (delete-backward-char 1)
+	       (move-end-of-line nil))))
+	   (newline)))
+       joined-code-coverage)
+
+      (beginning-of-buffer))))
+
+(defun jest-parse--lcov-report (lcov-report-html)
+  (if (dom-by-class lcov-report-html "coverage-summary")
+      (jest-parse--lcov-report-summary lcov-report-html)
+    (jest-parse--lcov-report-file lcov-report-html)))
 
 (defun jest-parse--lcov-report-target (&optional target)
   (let* ((target-file (cond
