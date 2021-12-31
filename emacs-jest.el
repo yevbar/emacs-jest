@@ -26,7 +26,6 @@
 
 ;;; Code:
 
-;; code goes here
 (require 'noflet)
 (require 'compile)
 (require 'xml)
@@ -52,14 +51,9 @@
   :type 'string
   :group 'jest)
 
-(defcustom jest-stop-after-first-failure nil
-  "Stop any jest call after first failure"
-  :type 'boolean
-  :group 'jest)
-
-(defcustom jest-stop-coverage-after-first-failure nil
-  "Stop a jest coverage call after first failure"
-  :type 'boolean
+(defcustom jest-coverage-default-args nil
+  "Arguments that get applied to all jest --coverage calls"
+  :type 'string
   :group 'jest)
 
 (defcustom jest-coverage-directory "coverage"
@@ -138,6 +132,9 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	 (to-pad-right (- difference to-pad-left)))
     (concat (make-string to-pad-left (string-to-char " ")) str (make-string to-pad-right (string-to-char " ")))))
 
+(defun truthy-string (str)
+  (and str (> (length str) 0)))
+
 ;;; Related to the compilation buffer
 (defun jest-compilation-filter ()
   "Filter function for compilation output."
@@ -166,16 +163,15 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
      ;; Otherwise we throw an error
      (t (error "Failed to find jest executable")))))
 
-(defun should-bail-after-first-failure (&optional is-coverage)
-  (or jest-stop-after-first-failure
-   (and is-coverage jest-stop-coverage-after-first-failure)))
-
 (defun with-coverage-args (&optional arguments)
-  (let* ((minimum-coverage-args (list "--coverage"))
-	 (coverage-args (if (should-bail-after-first-failure t) (append minimum-coverage-args (list "--bail")) minimum-coverage-args)))
-    (if arguments
-	(append arguments coverage-args)
-      coverage-args)))
+  (let* ((minimum-args (list "--coverage"))
+	 (with-default-args (if (truthy-string jest-coverage-default-args)
+				(append minimum-args (list jest-coverage-default-args))
+			      minimum-args))
+	 (with-args (if (truthy-string arguments)
+			(append arguments with-default-args)
+		      with-default-args)))
+    (with-args)))
 
 (defun get-jest-arguments (&optional arguments)
   (if arguments
@@ -184,8 +180,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	(list
 	 jest-environment-vars
 	 arguments
-	 jest-default-args
-	 (when (should-bail-after-first-failure) "--bail"))) " ")
+	 jest-default-args)) " ")
     ""))
 
 ;; Takes optional list of tuples and applies them to jest command

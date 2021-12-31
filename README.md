@@ -70,17 +70,13 @@ These are the command line args that get appended to the jest command before exe
 
 ![Jest Default Args](media/jest-default-args.png)
 
+### Jest Coverage Default Args
+
+Similar to [Jest Default Args](#jest-default-args) however these args get appended to `jest --coverage` calls
+
 ### Jest Environment Vars
 
 This the string that gets prepended to the command before execution so this would be where you put environment variables.
-
-### Jest Stop After First Failure
-
-Appends the [`-b`](https://jestjs.io/docs/cli#--bail) flag to the jest command before execution which abandons the process after the first test failure.
-
-### Jest Stop Coverage After First Failure
-
-Appends the [`-b`](https://jestjs.io/docs/cli#--bail) to the jest coverage command before execution which abandons the process after the first test failure.
 
 ## Helpful tips
 
