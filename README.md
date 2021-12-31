@@ -10,6 +10,12 @@ This package provides a way to work with [jest](https://jestjs.io/) in [emacs](h
 - [ ] Store historical values (ses files/coverage reports)
 - [ ] Make PR to add to Melpa!
 
+## Usage
+
+This package introduces a handful of functions for working with jest including:
+
+[Author note: For snippets that could be helpful with the below functions, check out [helpful scripts](#Helpful scripts)]
+
 ## Customization
 
 To customize the variables below, `M-x customize-group RET jest RET`
@@ -18,7 +24,9 @@ To customize the variables below, `M-x customize-group RET jest RET`
 
 This is the directory that the root `index.html` file is expected (Important: without trailing slash). For `html` coverage reports, this is simply the `coverageDirectory` value in your jest config file. For `lcov` coverage reports, this is the `coverageDirectory` value concatenated with `"/lcov-report"`.
 
-## Working with cells
+## Helpful scripts
+
+### Working with cells
 
 When presenting code coverage in an org-table, you may want to modify column width but still be able to access cell info. To do so, you can add something like the following to your `init.el` file
 
