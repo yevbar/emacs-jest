@@ -13,7 +13,7 @@ $ git clone git@github.com:yevbar/emacs-jest.git
 
 Then, in your config file
 
-``elisp
+```elisp
 (add-to-list 'load-path "~/desired/location/emacs-jest")
 (load "emacs-jest")
 ```
