@@ -2,14 +2,6 @@
 
 This package provides a way to work with [jest](https://jestjs.io/) in [emacs](https://www.gnu.org/software/emacs/)
 
-## TODO
-
-- [x] Be able to take advantage of defcustom or smth (ie to set maxWorkers etc)
-- [x] Be able to request to run with coverage report
-- [ ] Parse HTML output with percentages to view org files with coverage results https://emacs.stackexchange.com/a/46372
-- [ ] Store historical values (ses files/coverage reports)
-- [ ] Make PR to add to Melpa!
-
 ## Usage
 
 This package introduces a handful of functions for working with jest including:
@@ -44,3 +36,8 @@ When presenting code coverage in an org-table, you may want to modify column wid
 So that you can modify column width using [`<N>` notation](https://orgmode.org/manual/Column-Width-and-Alignment.html) and then press `C-c i` from within the cell you're in and see a message displaying information about the cell
 
 TODO - insert screenshot here
+
+## TODO
+
+- [ ] Store historical values (ses files/coverage reports)
+- [ ] Make PR to add to Melpa!
