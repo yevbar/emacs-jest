@@ -125,6 +125,12 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
      (lambda (x) (not (string-equal (car x) (cdr x))))
      zipped)))
 
+(defun pad-string-until-length (str desired-length)
+  (let* ((difference (- desired-length (length str)))
+	 (to-pad-left (/ difference 2))
+	 (to-pad-right (- difference to-pad-left)))
+    (concat (make-string to-pad-left (string-to-char " ")) str (make-string to-pad-right (string-to-char " ")))))
+
 ;;; Related to the compilation buffer
 (defun jest-compilation-filter ()
   "Filter function for compilation output."
@@ -404,7 +410,12 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   (let* ((td-elements (dom-by-tag lcov-report-html 'td))
 	 (line-coverage-section (second td-elements))
 	 (obtained-line-coverage-items (dom-by-tag line-coverage-section 'span))
-	 (line-coverage-items (mapcar (lambda (span-element) (list (get-relevant-cline-class span-element) (format-line-annotation-content span-element))) obtained-line-coverage-items))
+	 (line-coverage-items (mapcar (lambda (span-element)
+					(list
+					 (get-relevant-cline-class span-element)
+					 (format-line-annotation-content span-element)))
+				      obtained-line-coverage-items))
+	 (longest-line-coverage-text-length (-max (mapcar (lambda (x) (length (second x))) line-coverage-items)))
 	 (code-section (first (dom-by-tag (third td-elements) 'pre)))
 	 (code-lines (split-string (dom-texts code-section) "\n"))
 	 (code-lines-without-uncovered (split-string (dom-text code-section) "\n"))
@@ -427,20 +438,22 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	      (let* ((annotation (nth (1- line) line-coverage-items))
 		     (annotation-class (first annotation))
 		     (annotation-content (second annotation))
+		     (content (pad-string-until-length annotation-content (+ longest-line-coverage-text-length 1)))
 		     (color-to-apply (cond
 				      ((string-equal annotation-class "cline-no")
-				       "red")
+				       "green")
 				      ((string-equal annotation-class "cline-yes")
 				       "green")
 				      (t
 				       ""))))
-		(propertize annotation-content `((t (:background ,color-to-apply))) 'linum))))
+		(propertize content 'face 'linum))))
+		;; (propertize (pad-string-until-length annotation-content (+ longest-line-coverage-text-length 1)) `((t (:background ,color-to-apply))) 'linum))))
 
       (mapc
        (lambda (joined-code-coverage-item)
 	 (let ((code-content (car joined-code-coverage-item))
 	       (code-without-uncovered (cdr joined-code-coverage-item)))
-	   (insert code-content)
+	   (insert (replace-in-string "\u00A0" "" code-content))
 
 	   (cond
 	    ;; Do nothing if there are no uncovered snippets in the current line
