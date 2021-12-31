@@ -6,7 +6,7 @@ This package provides a way to work with [jest](https://jestjs.io/) in [emacs](h
 
 This package introduces a handful of functions for working with jest including:
 
-[Author note: For snippets that could be helpful with the below functions, check out [helpful scripts](#helpful-scripts)]
+[Author note: For snippets that could be helpful with the below functions, check out [helpful tips](#helpful-tips)]
 
 ### `jest-test-current-file`
 
@@ -22,7 +22,7 @@ To customize the variables below, `M-x customize-group RET jest RET`
 
 This is the directory that the root `index.html` file is expected (Important: without trailing slash). For `html` coverage reports, this is simply the `coverageDirectory` value in your jest config file. For `lcov` coverage reports, this is the `coverageDirectory` value concatenated with `"/lcov-report"`.
 
-## Helpful scripts
+## Helpful tips
 
 ### Making keybinds to quickly access functions
 
@@ -57,7 +57,15 @@ When presenting code coverage in an org-table, you may want to modify column wid
 
 So that you can modify column width using [`<N>` notation](https://orgmode.org/manual/Column-Width-and-Alignment.html) and then press `C-c i` from within the cell you're in and see a message displaying information about the cell
 
-TODO - insert screenshot here
+![Using `get-cell-info` function](media/get-cell-info.gif)
+
+### Sorting
+
+The coverage report is parsed and rendered into an [org mode table](https://orgmode.org/manual/Tables.html) which means you get all the perks that come with it. For something snazzy, if you'd like to sort rows by coverage, simply go to the column you want to sort and press `C-c ^` then press the key for however you'd like to sort it (`N` to sort numerically in descending order).
+
+![Sorting org table](media/org-table-sort.gif)
+
+In order to have the cell colors rerender after sorting, press `C-c C-c` (`Control+c` twice)
 
 ## TODO
 
