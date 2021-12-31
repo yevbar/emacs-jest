@@ -8,6 +8,12 @@ This package introduces a handful of functions for working with jest including:
 
 [Author note: For snippets that could be helpful with the below functions, check out [helpful scripts](#Helpful scripts)]
 
+### `jest-test-current-file`
+
+This takes the current test file and tests it by taking the jest command output into a compilation buffer (check out [this blog post](https://erick.navarro.io/blog/using-compilation-mode-to-run-all-the-things/) to see more cool usages of `M-x compile`)
+
+![Running `jest-test-current-file` function](media/jest-test-current-file.gif)
+
 ## Customization
 
 To customize the variables below, `M-x customize-group RET jest RET`
