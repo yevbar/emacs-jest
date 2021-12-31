@@ -60,6 +60,11 @@
   :type 'boolean
   :group 'jest)
 
+(defcustom jest-coverage-directory "coverage"
+  "The `coverageDirectory` value in your jest config file"
+  :type 'string
+  :group 'jest)
+
 ;; TODO - save historical results as custom config
 ;; TODO - if ^ then make chart to show jest coverage change over time (per branch etc)
 
@@ -489,7 +494,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		       (concat target "index.html"))
 		      (t
 		       (concat target ".html"))))
-	 (target-filepath (concat (projectile-project-root) "coverage/lcov-report/" target-file))
+	 (target-filepath (concat (projectile-project-root) jest-coverage-directory "/" target-file))
 	 (xml-dom-tree (with-temp-buffer
 			   (insert-file-contents target-filepath)
 			   (libxml-parse-html-region (point-min) (point-max)))))
