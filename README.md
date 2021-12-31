@@ -2,6 +2,22 @@
 
 This package provides a way to work with [jest](https://jestjs.io/) in [emacs](https://www.gnu.org/software/emacs/)
 
+## Installation
+
+This is still a work in progress and not hosted on a package repository so you would need to clone this repo and load the package.
+
+```bash
+$ cd ~/desired/location
+$ git clone git@github.com:yevbar/emacs-jest.git
+```
+
+Then, in your config file
+
+``elisp
+(add-to-list 'load-path "~/desired/location/emacs-jest")
+(load "emacs-jest")
+```
+
 ## Usage
 
 This package introduces a handful of functions for working with jest including:
