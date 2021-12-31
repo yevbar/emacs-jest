@@ -34,6 +34,8 @@
 (require 'highlight)
 (require 'dash)
 (require 'linum)
+(require 'projectile)
+(require 'helm-projectile)
 
 ;;; Custom vars
 (defgroup jest nil

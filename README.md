@@ -14,6 +14,26 @@ This takes the current test file and tests it by taking the jest command output 
 
 ![Running `jest-test-current-file` function](media/jest-test-current-file.gif)
 
+### `jest-test-file`
+
+Is an interactive function, provides a prompt to select a file to run jest on
+
+### `jest-test-current-directory`
+
+This takes the current directory and runs jest over the applicable files in the directory
+
+### `jest-test-directory`
+
+Is an interactive function, provides a prompt to select a directory to run jest on
+
+### `jest-test-coverage`
+
+Runs `jest --coverage` over the entire project
+
+### `jest-get-coverage`
+
+Gives you the coverage view for the entire project, you can see a screen recording in the [Making keybinds for quick access](#making-keybinds-for-quick-access) section
+
 ### `get-target-coverage`
 
 When viewing a table and you'd like to navigate to the folder/file belonging to the row your cursor is at, you can invoke `M-x get-target-coverage` or press `C-c c`
@@ -24,13 +44,31 @@ When viewing a table and you'd like to navigate to the folder/file belonging to 
 
 To customize the variables below, `M-x customize-group RET jest RET`
 
-### jest-coverage-directory
+### Jest Coverage Directory
 
-This is the directory that the root `index.html` file is expected (Important: without trailing slash). For `html` coverage reports, this is simply the `coverageDirectory` value in your jest config file. For `lcov` coverage reports, this is the `coverageDirectory` value concatenated with `"/lcov-report"`.
+This is the directory that the root `index.html` file is expected (Important: without trailing slash). For `html` coverage reports, this is simply the `coverageDirectory` value in your jest config file. For `lcov` coverage reports, this is the `coverageDirectory` value concatenated with `"/lcov-report"`
+
+### Jest Default Args
+
+These are the command line args that get appended to the jest command before execution so this would be where you put something like [maxWorkers](https://jestjs.io/docs/cli#--maxworkersnumstring).
+
+![Jest Default Args](media/jest-default-args.png)
+
+### Jest Environment Vars
+
+This the string that gets prepended to the command before execution so this would be where you put environment variables.
+
+### Jest Stop After First Failure
+
+Appends the [`-b`](https://jestjs.io/docs/cli#--bail) flag to the jest command before execution which abandons the process after the first test failure.
+
+### Jest Stop Coverage After First Failure
+
+Appends the [`-b`](https://jestjs.io/docs/cli#--bail) to the jest coverage command before execution which abandons the process after the first test failure.
 
 ## Helpful tips
 
-### Making keybinds to quickly access functions
+### Making keybinds for quick access
 
 Typing out `M-x jest-get-coverage RET` every time you want to view code coverage results may be a bit much if you're frequently iterating. To find a keybind or chord that isn't claimed by a function, you can do `C-h k <keybind or chord>` to see if it's associated with something.
 
