@@ -140,17 +140,15 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   "Filter function for compilation output."
   (ansi-color-apply-on-region compilation-filter-start (point-max)))
 
+(defun jest-after-completion (buffer desc))
+
 (define-compilation-mode jest-compilation-mode "Jest"
   "Jest compilation mode."
   (progn
     (set (make-local-variable 'compilation-error-regexp-alist) node-error-regexp-alist)
-    (set (make-local-variable 'compilation-finish-functions) 'jest-after-completion-hook)
+    (set (make-local-variable 'compilation-finish-functions) 'jest-after-completion)
     (add-hook 'compilation-filter-hook 'jest-compilation-filter nil t)
     ))
-
-;; TODO - change this to a list or smth so people can add their own custom extensions/modifications
-;; (append-to-list 'jest-after-completion-hook ...)
-(defun jest-after-completion-hook (&rest args))
 
 ;;; Related to actually running jest
 (defun get-jest-executable ()
@@ -274,7 +272,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   ;; Moving to start of file
   (beginning-of-buffer))
 
-;; TODO - use table-type for org/ses/etc
 (defun present-coverage-as-table (title columns table &optional table-type)
   (when (= (length columns) 0)
     (error "Invalid columns passed in"))
@@ -332,7 +329,6 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	   (t
 	    trimmed-title-text)))
 	 (category-tags (dom-by-class lcov-report-html "space-right2"))
-	 ;; TODO break up into flatter let block
 	 (category-stats (string-join
 			  (mapcar 'format-meta-category-stat category-tags)
 			  ", ")))
@@ -390,6 +386,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 (defun format-line-annotation-content (dom-element)
   (replace-in-string "\u00A0" "" (dom-text dom-element)))
 
+;; TODO - define minor mode to handle interactions + syntax highlighting
 (defun jest-parse--lcov-report-file (lcov-report-html)
   (let* ((td-elements (dom-by-tag lcov-report-html 'td))
 	 (line-coverage-section (second td-elements))

@@ -78,6 +78,19 @@ Similar to [Jest Default Args](#jest-default-args) however these args get append
 
 This the string that gets prepended to the command before execution so this would be where you put environment variables.
 
+## Customizable functions
+
+### `jest-after-completion`
+
+If you'd like to execute something after jest finishes running in the compilation buffer, you can overwrite this function. The two arguments that get provided are the buffer and a string description of how the process finished; check out `C-h v compilation-finish-functions RET` to learn more.
+
+```elisp
+(defun 'jest-after-completion (buffer desc)
+  (message "We finished %s: %s" buffer desc))
+```
+
+Now when the jest process exits, you'll see a message in the minibar with the formatted string defined.
+
 ## Helpful tips
 
 ### Making keybinds for quick access
