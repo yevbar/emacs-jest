@@ -169,7 +169,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	 (with-args (if (truthy-string arguments)
 			(append arguments with-default-args)
 		      with-default-args)))
-    (with-args)))
+    with-args))
 
 (defun get-jest-arguments (&optional arguments)
   (if arguments
